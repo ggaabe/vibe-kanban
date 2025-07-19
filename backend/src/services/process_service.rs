@@ -202,6 +202,7 @@ impl ProcessService {
             .ok_or(TaskAttemptError::TaskNotFound)?;
 
         let executor_config = Self::resolve_executor_config(&task_attempt.executor);
+        let model = Self::extract_model(&task_attempt.executor);
 
         Self::start_process_execution(
             pool,
@@ -212,6 +213,7 @@ impl ProcessService {
             "Starting executor".to_string(),
             ExecutionProcessType::CodingAgent,
             &task_attempt.worktree_path,
+            model,
         )
         .await
     }
@@ -279,6 +281,7 @@ impl ProcessService {
             "Starting dev server".to_string(),
             ExecutionProcessType::DevServer,
             &worktree_path,
+            None,
         )
         .await;
 
@@ -458,6 +461,7 @@ impl ProcessService {
             "Starting follow-up executor".to_string(),
             ExecutionProcessType::CodingAgent,
             &worktree_path,
+            None,
         )
         .await;
 
@@ -504,6 +508,7 @@ impl ProcessService {
         activity_note: String,
         process_type: ExecutionProcessType,
         worktree_path: &str,
+        model: Option<String>,
     ) -> Result<(), TaskAttemptError> {
         let process_id = Uuid::new_v4();
 
@@ -549,6 +554,7 @@ impl ProcessService {
             attempt_id,
             process_id,
             worktree_path,
+            model,
         )
         .await?;
 
@@ -610,13 +616,17 @@ impl ProcessService {
             "Starting setup script".to_string(),
             ExecutionProcessType::SetupScript,
             worktree_path,
+            None,
         )
         .await
     }
 
     /// Resolve executor configuration from string name
     fn resolve_executor_config(executor_name: &Option<String>) -> crate::executor::ExecutorConfig {
-        match executor_name.as_ref().map(|s| s.as_str()) {
+        let base = executor_name
+            .as_ref()
+            .map(|s| s.split(':').next().unwrap_or(s));
+        match base {
             Some("claude") => crate::executor::ExecutorConfig::Claude,
             Some("claude-plan") => crate::executor::ExecutorConfig::ClaudePlan,
             Some("claude-code-router") => crate::executor::ExecutorConfig::ClaudeCodeRouter,
@@ -626,6 +636,12 @@ impl ProcessService {
             Some("sst-opencode") => crate::executor::ExecutorConfig::SstOpencode,
             _ => crate::executor::ExecutorConfig::Echo, // Default for "echo" or None
         }
+    }
+
+    fn extract_model(executor_name: &Option<String>) -> Option<String> {
+        executor_name
+            .as_ref()
+            .and_then(|s| s.split_once(':').map(|(_, model)| model.to_string()))
     }
 
     /// Create execution process database record
@@ -733,7 +749,7 @@ impl ProcessService {
                     .await
             }
             crate::executor::ExecutorType::CodingAgent(config) => {
-                let executor = config.create_executor();
+                let executor = config.create_executor(model.clone());
                 executor
                     .execute_streaming(pool, task_id, attempt_id, process_id, worktree_path)
                     .await
@@ -785,7 +801,7 @@ impl ProcessService {
                     }
                     crate::executor::ExecutorConfig::Echo => {
                         // Echo doesn't support followup, use regular echo
-                        config.create_executor()
+                        config.create_executor(None)
                     }
                     crate::executor::ExecutorConfig::CharmOpencode => {
                         if let Some(sid) = session_id {
@@ -816,7 +832,7 @@ impl ProcessService {
                     }
                     crate::executor::ExecutorConfig::SetupScript { .. } => {
                         // Setup scripts don't support followup, use regular setup script
-                        config.create_executor()
+                        config.create_executor(None)
                     }
                 };
 

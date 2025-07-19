@@ -395,7 +395,7 @@ impl FromStr for ExecutorConfig {
 }
 
 impl ExecutorConfig {
-    pub fn create_executor(&self) -> Box<dyn Executor> {
+    pub fn create_executor(&self, model: Option<String>) -> Box<dyn Executor> {
         match self {
             ExecutorConfig::Echo => Box::new(EchoExecutor),
             ExecutorConfig::Claude => Box::new(ClaudeExecutor::new()),
@@ -404,7 +404,7 @@ impl ExecutorConfig {
             ExecutorConfig::Gemini => Box::new(GeminiExecutor),
             ExecutorConfig::ClaudeCodeRouter => Box::new(CCRExecutor::new()),
             ExecutorConfig::CharmOpencode => Box::new(CharmOpencodeExecutor),
-            ExecutorConfig::SstOpencode => Box::new(SstOpencodeExecutor::new()),
+            ExecutorConfig::SstOpencode => Box::new(SstOpencodeExecutor::new(model)),
             ExecutorConfig::SetupScript { script } => {
                 Box::new(SetupScriptExecutor::new(script.clone()))
             }

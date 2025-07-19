@@ -110,7 +110,7 @@ pub async fn normalized_logs_stream(
                         let executor_type = proc.executor_type.as_deref().unwrap_or("unknown");
                         crate::executor::ExecutorConfig::from_str(executor_type)
                             .ok()
-                            .map(|config| (config.create_executor(), proc))
+                            .map(|config| (config.create_executor(None), proc))
                     })
                     .and_then(|(executor, proc)| {
                         let stdout = proc.stdout.unwrap_or_default();

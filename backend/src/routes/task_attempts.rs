@@ -122,7 +122,7 @@ async fn normalize_process_logs(
                     }
                 }
             };
-            let executor = executor_config.create_executor();
+            let executor = executor_config.create_executor(None);
             let working_dir_path = match std::fs::canonicalize(&process.working_directory) {
                 Ok(canonical_path) => canonical_path.to_string_lossy().to_string(),
                 Err(_) => process.working_directory.clone(),
@@ -1189,7 +1189,7 @@ async fn find_plan_content_with_context(
             if !stdout.trim().is_empty() {
                 // Create executor and normalize logs
                 let executor_config = ExecutorConfig::ClaudePlan;
-                let executor = executor_config.create_executor();
+                let executor = executor_config.create_executor(None);
 
                 // Use working directory for normalization
                 let working_dir_path =

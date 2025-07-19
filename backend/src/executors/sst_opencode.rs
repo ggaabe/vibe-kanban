@@ -227,10 +227,14 @@ impl Default for SstOpencodeExecutor {
 
 impl SstOpencodeExecutor {
     /// Create a new SstOpencodeExecutor with default settings
-    pub fn new() -> Self {
+    pub fn new(model: Option<String>) -> Self {
+        let mut command = "npx -y opencode-ai@latest run --print-logs".to_string();
+        if let Some(m) = &model {
+            command.push_str(&format!(" --model {}", m));
+        }
         Self {
             executor_type: "SST Opencode".to_string(),
-            command: "npx -y opencode-ai@latest run --print-logs".to_string(),
+            command,
         }
     }
 }
@@ -504,7 +508,7 @@ impl Executor for SstOpencodeFollowupExecutor {
         worktree_path: &str,
     ) -> Result<NormalizedConversation, String> {
         // Reuse the same logic as the main SstOpencodeExecutor
-        let main_executor = SstOpencodeExecutor::new();
+        let main_executor = SstOpencodeExecutor::new(None);
         main_executor.normalize_logs(logs, worktree_path)
     }
 }
@@ -522,7 +526,7 @@ mod tests {
     // Test the actual format that comes from the database (normalized JSON entries)
     #[test]
     fn test_normalize_logs_with_database_format() {
-        let executor = SstOpencodeExecutor::new();
+        let executor = SstOpencodeExecutor::new(None);
 
         // This is what the database should contain after our streaming function processes it
         let logs = r#"{"timestamp":"2025-07-16T18:04:00Z","entry_type":{"type":"tool_use","tool_name":"Read","action_type":{"action":"file_read","path":"hello.js"}},"content":"`hello.js`","metadata":{"filePath":"/path/to/repo/hello.js"}}
@@ -581,7 +585,7 @@ mod tests {
 
     #[test]
     fn test_normalize_logs_with_session_id() {
-        let executor = SstOpencodeExecutor::new();
+        let executor = SstOpencodeExecutor::new(None);
 
         // Test session ID in JSON metadata - current implementation always returns None for session_id
         let logs = r#"{"timestamp":"2025-07-16T18:04:00Z","entry_type":{"type":"assistant_message"},"content":"Session started","metadata":null,"session_id":"ses_abc123"}
@@ -594,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_normalize_logs_legacy_fallback() {
-        let executor = SstOpencodeExecutor::new();
+        let executor = SstOpencodeExecutor::new(None);
 
         // Current implementation doesn't handle legacy format - it only parses JSON entries
         let logs = r#"INFO session=ses_legacy123 starting
@@ -735,7 +739,7 @@ The file listing shows several items."#;
 
     #[test]
     fn test_normalize_logs_edge_cases() {
-        let executor = SstOpencodeExecutor::new();
+        let executor = SstOpencodeExecutor::new(None);
 
         // Empty content
         let result = executor.normalize_logs("", "/tmp").unwrap();

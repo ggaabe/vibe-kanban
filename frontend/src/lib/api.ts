@@ -484,6 +484,13 @@ export const attemptsApi = {
   },
 };
 
+export const opencodeApi = {
+  getModels: async (): Promise<string[]> => {
+    const response = await makeRequest('/api/opencode/models');
+    return handleApiResponse<string[]>(response);
+  },
+};
+
 // Execution Process APIs
 export const executionProcessesApi = {
   getDetails: async (

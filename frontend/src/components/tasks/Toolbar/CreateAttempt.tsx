@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useCallback, useContext } from 'react';
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect } from 'react';
 import { Button } from '@/components/ui/button.tsx';
 import { ArrowDown, Play, Settings2, X } from 'lucide-react';
 import {
@@ -7,8 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.tsx';
 import type { GitBranch, TaskAttempt } from 'shared/types.ts';
-import { attemptsApi } from '@/lib/api.ts';
+import { attemptsApi, opencodeApi } from '@/lib/api.ts';
 import {
   TaskAttemptDataContext,
   TaskDetailsContext,
@@ -68,13 +69,29 @@ function CreateAttempt({
   const [pendingBaseBranch, setPendingBaseBranch] = useState<
     string | undefined
   >(undefined);
+  const [opencodeModels, setOpencodeModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (createAttemptExecutor === 'sst-opencode' && opencodeModels.length === 0) {
+      opencodeApi
+        .getModels()
+        .then(setOpencodeModels)
+        .catch(() => {});
+    }
+  }, [createAttemptExecutor, opencodeModels.length]);
 
   // Create attempt logic
   const actuallyCreateAttempt = useCallback(
     async (executor?: string, baseBranch?: string) => {
       try {
         await attemptsApi.create(projectId!, task.id, {
-          executor: executor || selectedExecutor,
+          executor:
+            executor ||
+            selectedExecutor +
+              (selectedExecutor === 'sst-opencode' && selectedModel
+                ? `:${selectedModel}`
+                : ''),
           base_branch: baseBranch || selectedBranch,
         });
         fetchTaskAttempts();
@@ -82,7 +99,7 @@ function CreateAttempt({
         // Optionally handle error
       }
     },
-    [projectId, task.id, selectedExecutor, selectedBranch, fetchTaskAttempts]
+    [projectId, task.id, selectedExecutor, selectedBranch, selectedModel, fetchTaskAttempts]
   );
 
   // Handler for Enter key or Start button
@@ -212,6 +229,28 @@ function CreateAttempt({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {createAttemptExecutor === 'sst-opencode' && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Model
+                </label>
+              </div>
+              <Select value={selectedModel || ''} onValueChange={setSelectedModel}>
+                <SelectTrigger id="model">
+                  <SelectValue placeholder="Select model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {opencodeModels.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Step 3: Start Attempt */}
           <div className="space-y-1">
