@@ -226,11 +226,20 @@ impl Default for SstOpencodeExecutor {
 }
 
 impl SstOpencodeExecutor {
-    /// Create a new SstOpencodeExecutor with default settings
+    /// Create a new SstOpencodeExecutor with optional model
     pub fn new() -> Self {
+        Self::new_with_model(None)
+    }
+
+    pub fn new_with_model(model: Option<String>) -> Self {
+        let mut command = "npx -y opencode-ai@latest run --print-logs".to_string();
+        if let Some(m) = model {
+            command.push_str(" --model ");
+            command.push_str(&m);
+        }
         Self {
             executor_type: "SST Opencode".to_string(),
-            command: "npx -y opencode-ai@latest run --print-logs".to_string(),
+            command,
         }
     }
 }
