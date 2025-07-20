@@ -1,4 +1,4 @@
-import { Dispatch, SetStateAction, useCallback, useContext } from 'react';
+import { Dispatch, SetStateAction, useCallback, useContext, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button.tsx';
 import { ArrowDown, Play, Settings2, X } from 'lucide-react';
 import {
@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.tsx';
 import type { GitBranch, TaskAttempt } from 'shared/types.ts';
-import { attemptsApi } from '@/lib/api.ts';
+import { attemptsApi, opencodeApi } from '@/lib/api.ts';
 import {
   TaskAttemptDataContext,
   TaskDetailsContext,
@@ -24,7 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.tsx';
-import { useState } from 'react';
 
 type Props = {
   branches: GitBranch[];
@@ -68,6 +67,19 @@ function CreateAttempt({
   const [pendingBaseBranch, setPendingBaseBranch] = useState<
     string | undefined
   >(undefined);
+  const [opencodeModels, setOpencodeModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (createAttemptExecutor === 'sst-opencode') {
+      opencodeApi
+        .getModels()
+        .then(setOpencodeModels)
+        .catch(() => setOpencodeModels([]));
+    } else {
+      setSelectedModel(null);
+    }
+  }, [createAttemptExecutor]);
 
   // Create attempt logic
   const actuallyCreateAttempt = useCallback(
@@ -88,17 +100,21 @@ function CreateAttempt({
   // Handler for Enter key or Start button
   const onCreateNewAttempt = useCallback(
     (executor?: string, baseBranch?: string, isKeyTriggered?: boolean) => {
+      const execWithModel =
+        executor === 'sst-opencode' && selectedModel
+          ? `${executor} --model ${selectedModel}`
+          : executor;
       if (task.status === 'todo' && isKeyTriggered) {
-        setPendingExecutor(executor);
+        setPendingExecutor(execWithModel);
         setPendingBaseBranch(baseBranch);
         setShowCreateAttemptConfirmation(true);
       } else {
-        actuallyCreateAttempt(executor, baseBranch);
+        actuallyCreateAttempt(execWithModel, baseBranch);
         setShowCreateAttemptConfirmation(false);
         setIsInCreateAttemptMode(false);
       }
     },
-    [task.status, actuallyCreateAttempt, setIsInCreateAttemptMode]
+    [task.status, actuallyCreateAttempt, setIsInCreateAttemptMode, selectedModel]
   );
 
   // Keyboard shortcuts
@@ -212,6 +228,38 @@ function CreateAttempt({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          {createAttemptExecutor === 'sst-opencode' && (
+            <div className="space-y-1 col-span-3">
+              <div className="flex items-center gap-1.5">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Model
+                </label>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full justify-between text-xs">
+                    <span className="truncate">{selectedModel || 'Default'}</span>
+                    <ArrowDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full">
+                  <DropdownMenuItem onClick={() => setSelectedModel(null)}>
+                    Default
+                  </DropdownMenuItem>
+                  {opencodeModels.map((model) => (
+                    <DropdownMenuItem
+                      key={model}
+                      onClick={() => setSelectedModel(model)}
+                      className={selectedModel === model ? 'bg-accent' : ''}
+                    >
+                      {model}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
 
           {/* Step 3: Start Attempt */}
           <div className="space-y-1">

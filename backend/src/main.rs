@@ -35,7 +35,8 @@ use middleware::{
 };
 use models::{ApiResponse, Config};
 use routes::{
-    auth, config, filesystem, health, projects, stream, task_attempts, task_templates, tasks,
+    auth, config, filesystem, health, opencode, projects, stream, task_attempts, task_templates,
+    tasks,
 };
 use services::PrMonitorService;
 
@@ -197,6 +198,7 @@ fn main() -> anyhow::Result<()> {
             let base_routes = Router::new()
                 .merge(stream::stream_router())
                 .merge(filesystem::filesystem_router())
+                .merge(opencode::opencode_router())
                 .merge(config::config_router())
                 .merge(auth::auth_router())
                 .route("/sounds/:filename", get(serve_sound_file))

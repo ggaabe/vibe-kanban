@@ -628,7 +628,10 @@ impl ProcessService {
 
     /// Resolve executor configuration from string name
     fn resolve_executor_config(executor_name: &Option<String>) -> crate::executor::ExecutorConfig {
-        match executor_name.as_ref().map(|s| s.as_str()) {
+        let base = executor_name
+            .as_ref()
+            .map(|s| s.split_whitespace().next().unwrap_or(s));
+        match base.as_deref() {
             Some("claude") => crate::executor::ExecutorConfig::Claude,
             Some("claude-plan") => crate::executor::ExecutorConfig::ClaudePlan,
             Some("claude-code-router") => crate::executor::ExecutorConfig::ClaudeCodeRouter,
@@ -638,6 +641,17 @@ impl ProcessService {
             Some("sst-opencode") => crate::executor::ExecutorConfig::SstOpencode,
             _ => crate::executor::ExecutorConfig::Echo, // Default for "echo" or None
         }
+    }
+
+    fn parse_model_flag(executor: &Option<String>) -> Option<String> {
+        let exec_str = executor.as_ref()?;
+        let mut iter = exec_str.split_whitespace();
+        while let Some(part) = iter.next() {
+            if part == "--model" {
+                return iter.next().map(|s| s.to_string());
+            }
+        }
+        None
     }
 
     /// Create execution process database record
@@ -745,7 +759,15 @@ impl ProcessService {
                     .await
             }
             crate::executor::ExecutorType::CodingAgent { config, follow_up } => {
-                let executor = config.create_executor();
+                let task_attempt = TaskAttempt::find_by_id(pool, attempt_id)
+                    .await?
+                    .ok_or(TaskAttemptError::TaskNotFound)?;
+                let model = Self::parse_model_flag(&task_attempt.executor);
+                let executor = if matches!(config, crate::executor::ExecutorConfig::SstOpencode) {
+                    config.create_executor_with_model(model)
+                } else {
+                    config.create_executor()
+                };
 
                 if let Some(ref follow_up_info) = follow_up {
                     executor
